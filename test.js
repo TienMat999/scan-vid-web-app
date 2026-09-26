@@ -223,7 +223,7 @@ async function runAll() {
 
     const browser = await puppeteer.launch({
         headless: 'new',
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--allow-file-access-from-files'],
     });
     const page = await browser.newPage();
     page.waitForTimeout = ms => new Promise(r => setTimeout(r, ms));
