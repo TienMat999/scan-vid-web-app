@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan VID Web App</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+        if (typeof XLSX === 'undefined') {
+            document.write('<script src="./vendor/xlsx.full.min.js"><\/script>');
+        }
+    </script>
+    <style>
+        /* ========== RESET & BASE ========== */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #e8ecf1;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            max-width: 900px;
+            max-height: 88vh;
+            margin: auto;
+        }
+
+        /* ========== HEADER ========== */
+        .app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 20px;
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            flex-shrink: 0;
+            user-select: none;
+        }
+
+        .app-header h1 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        /* ========== MAIN LAYOUT ========== */
+        .app-main {
+            display: flex;
+            flex: 1;
+            padding: 10px;
+            gap: 10px;
+            min-height: 0;
+        }
+
+        /* ========== LEFT SECTION ========== */
+        .left-section {
+            width: 35%;
+            min-width: 280px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        /* ========== RIGHT SECTION ========== */
+        .right-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-height: 0;
+        }
+
+        /* ========== PANEL (shared) ========== */
+        .panel {
+            display: flex;
+            flex-direction: column;
+            border-radius: 6px;
+            background: #fff;
+            border: 2px solid #ccc;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 10px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            user-select: none;
+            flex-shrink: 0;
+        }
+
+        /* ---- colour per panel ---- */
+        .panel-input   { border-color: #3498db; }
+        .panel-search  { border-color: #27ae60; overflow: visible; }
+        .panel-vid-in  { border-color: #e67e22; }
+        .panel-vid-out { border-color: #8e44ad; }
+
+        .panel-input  .panel-header { background: #3498db; color: #fff; }
+        .panel-search .panel-header { background: #27ae60; color: #fff; border-radius: 4px 4px 0 0; }
+        .panel-vid-in .panel-header { background: #e67e22; color: #fff; }
+        .panel-vid-out .panel-header { background: #8e44ad; color: #fff; }
+
+        /* ========== TEXTAREA & INPUT (shared) ========== */
+        textarea,
+        input[type="text"] {
+            border: none;
+            outline: none;
+            padding: 6px 10px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.84rem;
+            resize: none;
+            background: #fff;
+        }
+
+        textarea { flex: 1; min-height: 0; }
+
+        input[type="text"]:disabled {
+            background: #f0f0f0;
+            color: #999;
+            cursor: not-allowed;
+        }
+
+        #field4 {
+            background: #fafafa;
+            cursor: default;
+        }
+
+        /* ---- scrollbar ---- */
+        textarea::-webkit-scrollbar       { width: 7px; }
+        textarea::-webkit-scrollbar-track  { background: #f1f1f1; }
+        textarea::-webkit-scrollbar-thumb  { background: #bbb; border-radius: 4px; }
+        textarea::-webkit-scrollbar-thumb:hover { background: #999; }
+
+        /* ========== FIELD 1 (left, stretches full height) ========== */
+        .panel-input { flex: 1; min-height: 0; }
+
+        /* ========== FIELD 2 ROW ========== */
+        .field2-row {
+            display: flex;
+            gap: 6px;
+            align-items: stretch;
+        }
+
+        .field2-row .panel-search {
+            flex: 1;
+            position: relative;
+        }
+
+        #field2 { width: 100%; }
+
+        /* ---- autocomplete ---- */
+        .ac-dropdown {
+            position: absolute;
+            top: 100%;
+            left: -2px;
+            right: -2px;
+            background: #fff;
+            border: 2px solid #27ae60;
+            border-top: 1px solid #ddd;
+            border-radius: 0 0 6px 6px;
+            max-height: 220px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 6px 16px rgba(0,0,0,.15);
+        }
+        .ac-dropdown.open { display: block; }
+
+        .ac-item {
+            padding: 6px 10px;
+            cursor: pointer;
+            font-family: 'Consolas', monospace;
+            font-size: 0.82rem;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .ac-item:last-child { border-bottom: none; }
+        .ac-item:hover, .ac-item.hi {
+            background: #27ae60;
+            color: #fff;
+        }
+        .ac-item .ac-group {
+            font-size: 0.7rem;
+            opacity: .7;
+            margin-left: 8px;
+        }
+        .ac-item .ac-done {
+            font-size: 0.68rem;
+            color: #27ae60;
+            font-weight: 700;
+        }
+        .ac-item.hi .ac-done,
+        .ac-item:hover .ac-done { color: #b7f5cc; }
+
+        /* ========== FIELD 3 ========== */
+        #field3 { width: 100%; transition: border-color .2s, box-shadow .2s; }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-6px); }
+            40%, 80% { transform: translateX(6px); }
+        }
+        .input-error {
+            border-color: #e74c3c !important;
+            box-shadow: 0 0 8px rgba(231, 76, 60, 0.6) !important;
+            animation: shake 0.35s ease-in-out;
+        }
+
+        /* ========== FIELD 4 AREA (takes remaining space) ========== */
+        .field4-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-height: 0;
+        }
+
+        .field4-area .panel-vid-out {
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* ========== BUTTONS ========== */
+        button {
+            padding: 7px 16px;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity .15s, transform .1s;
+            white-space: nowrap;
+            user-select: none;
+        }
+        button:hover  { opacity: .85; }
+        button:active { transform: scale(.97); }
+        button:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-input  { background: #3498db; color: #fff; }
+        .btn-scan   { background: #27ae60; color: #fff; align-self: stretch; }
+        .btn-next   { background: #e67e22; color: #fff; padding: 9px 28px; font-size: .82rem; }
+        .btn-export { background: #8e44ad; color: #fff; transition: all .25s ease; }
+        .btn-export:not(:disabled) {
+            box-shadow: 0 0 10px rgba(142, 68, 173, 0.75);
+            font-weight: 700;
+        }
+        .btn-copy   { background: #1abc9c; color: #fff; }
+        .btn-merge  { background: #16a085; color: #fff; }
+
+        /* button rows */
+        .btn-row-left  { display: flex; justify-content: flex-end; }
+        .btn-row-next  { display: flex; justify-content: flex-end; }
+        .btn-row-copy  { display: flex; justify-content: flex-end; }
+
+        /* ========== LOT INFO BADGE ========== */
+        .badge {
+            font-size: 0.72rem;
+            background: rgba(255,255,255,.25);
+            padding: 1px 8px;
+            border-radius: 10px;
+        }
+
+        /* ========== STATUS BAR ========== */
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 20px;
+            background: #2c3e50;
+            color: #95a5a6;
+            font-size: 0.74rem;
+            flex-shrink: 0;
+            min-height: 26px;
+            user-select: none;
+        }
+        .st-ok  { color: #2ecc71; }
+        .st-wrn { color: #f1c40f; }
+        .st-err { color: #e74c3c; }
+
+        /* ========== THEME TOGGLE BUTTON ========== */
+        .btn-theme-toggle {
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            padding: 5px 11px;
+            border-radius: 4px;
+            font-size: 0.74rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            user-select: none;
+        }
+        .btn-theme-toggle:hover {
+            background: rgba(255, 255, 255, 0.28);
+        }
+
+        /* ========== DARK MODE STYLES ========== */
+        body.dark-mode {
+            background: #141619;
+            color: #e4e6eb;
+        }
+
+        body.dark-mode .app-header {
+            background: linear-gradient(135deg, #181a1f, #22252c);
+            border-bottom: 1px solid #2e323b;
+        }
+
+        body.dark-mode .panel {
+            background: #1e2128;
+            border-color: #3b3f4a;
+        }
+
+        body.dark-mode .panel-input   { border-color: #2980b9; }
+        body.dark-mode .panel-search  { border-color: #27ae60; }
+        body.dark-mode .panel-vid-in  { border-color: #d35400; }
+        body.dark-mode .panel-vid-out { border-color: #8e44ad; }
+
+        body.dark-mode textarea,
+        body.dark-mode input[type="text"] {
+            background: #181a1f;
+            color: #e4e6eb;
+        }
+
+        body.dark-mode textarea::placeholder,
+        body.dark-mode input[type="text"]::placeholder {
+            color: #6c727f;
+        }
+
+        body.dark-mode input[type="text"]:disabled {
+            background: #121316;
+            color: #555b66;
+        }
+
+        body.dark-mode #field4 {
+            background: #15171b;
+            color: #e4e6eb;
+        }
+
+        body.dark-mode textarea::-webkit-scrollbar-track {
+            background: #181a1f;
+        }
+        body.dark-mode textarea::-webkit-scrollbar-thumb {
+            background: #3b3f4a;
+        }
+        body.dark-mode textarea::-webkit-scrollbar-thumb:hover {
+            background: #4f5563;
+        }
+
+        body.dark-mode .ac-dropdown {
+            background: #1e2128;
+            border-color: #27ae60;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+        }
+
+        body.dark-mode .ac-item {
+            border-bottom: 1px solid #292d36;
+            color: #e4e6eb;
+        }
+
+        body.dark-mode .ac-item:hover,
+        body.dark-mode .ac-item.hi {
+            background: #1e824c;
+            color: #fff;
+        }
+
+        body.dark-mode .ac-item .ac-group {
+            color: #a0a6b5;
+        }
+
+        body.dark-mode .status-bar {
+            background: #181a1f;
+            color: #8a919e;
+            border-top: 1px solid #282c35;
+        }
+
+        body.dark-mode .input-error {
+            border-color: #e74c3c !important;
+            box-shadow: 0 0 10px rgba(231, 76, 60, 0.7) !important;
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- ==================== HEADER ==================== -->
+<header class="app-header">
+    <h1>📋 Scan VID Web App</h1>
+    <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:.72rem; opacity:.75;">Owner: TANG, HUYNH MINH TIEN</span>
+        <button class="btn-theme-toggle" id="btnThemeToggle" title="Chuyển chế độ Sáng / Tối">🌙 Dark</button>
+        <button class="btn-merge" id="btnMergeFile" title="Nhập file Excel làm chung để hợp nhất">📥 Nhập file gộp</button>
+        <input type="file" id="fileMergeInput" accept=".xlsx, .xls" style="display:none;" />
+        <button class="btn-export" id="btnExport" disabled>📤 Xuất Output</button>
+    </div>
+</header>
+
+<!-- ==================== MAIN ==================== -->
+<main class="app-main">
+
+    <!-- ---- LEFT: Field 1 ---- -->
+    <section class="left-section">
+        <div class="panel panel-input">
+            <div class="panel-header"><span>📥 Input Lot Data</span></div>
+            <textarea id="field1" spellcheck="false"
+                      placeholder="Dán dữ liệu lot vào đây...&#10;&#10;Ví dụ:&#10;INTMS#86757&#10;U482K915-!7&#10;Z109M384-!2&#10;..."></textarea>
+        </div>
+        <div class="btn-row-left">
+            <button class="btn-input" id="btnInput">▶ Nhập Input</button>
+        </div>
+    </section>
+
+    <!-- ---- RIGHT: Fields 2, 3, 4 ---- -->
+    <section class="right-section">
+
+        <!-- Field 2 + Scan button -->
+        <div class="field2-row">
+            <div class="panel panel-search">
+                <div class="panel-header"><span>🔍 Search Lot</span></div>
+                <input type="text" id="field2" disabled autocomplete="off" spellcheck="false"
+                       placeholder="Nhập tên lot (VD: K915)…" />
+                <div class="ac-dropdown" id="acDropdown"></div>
+            </div>
+            <button class="btn-scan" id="btnScan" disabled>⏎ Scan<br>VID</button>
+        </div>
+
+        <!-- Field 3 -->
+        <div class="panel panel-vid-in">
+            <div class="panel-header">
+                <span>📝 Nhập VID</span>
+                <span class="badge" id="lotBadge">Chưa chọn lot</span>
+            </div>
+            <input type="text" id="field3" disabled autocomplete="off" spellcheck="false"
+                   placeholder="Nhập VID và nhấn Enter…" />
+        </div>
+
+        <!-- Next Lot button -->
+        <div class="btn-row-next">
+            <button class="btn-next" id="btnNext" disabled>⏭ Next Lot</button>
+        </div>
+
+        <!-- Field 4 + Copy button -->
+        <div class="field4-area">
+            <div class="panel panel-vid-out">
+                <div class="panel-header">
+                    <span>📋 VID List</span>
+                    <span class="badge" id="vidBadge">0 VIDs</span>
+                </div>
+                <textarea id="field4" readonly
+                          placeholder="Các VID đã scan sẽ hiển thị ở đây…"></textarea>
+            </div>
+            <div class="btn-row-copy">
+                <button class="btn-copy" id="btnCopy">📋 Copy VID</button>
+            </div>
+        </div>
+
+    </section>
+</main>
+
+<!-- ==================== STATUS BAR ==================== -->
+<div class="status-bar">
+    <a href="mailto:huynhx.minh.tien.tang@intel.com?subject=Scan VID Web App - Thắc mắc"
+       style="color:#74b9ff; text-decoration:none; font-size:.72rem; white-space:nowrap;"
+       title="Gửi mail thắc mắc">✉ Liên hệ hỗ trợ</a>
+    <span id="statusBar">Sẵn sàng — Dán dữ liệu lot vào ô bên trái rồi nhấn <b>▶ Nhập Input</b>.</span>
+</div>
+
+<!-- ==================== JAVASCRIPT ==================== -->
+<script>
+(function () {
+    'use strict';
+
+    /* ===== DOM refs ===== */
+    const field1      = document.getElementById('field1');
+    const field2      = document.getElementById('field2');
+    const field3      = document.getElementById('field3');
+    const field4      = document.getElementById('field4');
+    const acDropdown  = document.getElementById('acDropdown');
+    const btnInput    = document.getElementById('btnInput');
+    const btnScan     = document.getElementById('btnScan');
+    const btnNext     = document.getElementById('btnNext');
+    const btnExport   = document.getElementById('btnExport');
+    const btnCopy     = document.getElementById('btnCopy');
+    const btnThemeToggle = document.getElementById('btnThemeToggle');
+    const btnMergeFile   = document.getElementById('btnMergeFile');
+    const fileMergeInput = document.getElementById('fileMergeInput');
+    const lotBadge    = document.getElementById('lotBadge');
+    const vidBadge    = document.getElementById('vidBadge');
+    const statusBar   = document.getElementById('statusBar');
+
+    /* ===== STATE ===== */
+    let intmsGroups   = [];   // [{name, lots:[string]}]
+    let lotToGroup    = {};   // lotName -> groupName
+    let allLots       = [];   // flat array of lot names
+
+    let scannedLots   = [];   // [{lot, vids:[], group}]  — preserved in scan order
+    let globalVids    = new Set();  // all VIDs across all lots (duplicate guard)
+    let currentLot    = null;
+    let currentVids   = [];
+
+    let acResults     = [];
+    let acIndex       = -1;
+
+    // Expose getters for automation tests
+    Object.defineProperties(window, {
+        allLots:     { get: () => allLots },
+        intmsGroups: { get: () => intmsGroups },
+        lotToGroup:  { get: () => lotToGroup },
+        scannedLots: { get: () => scannedLots },
+        globalVids:  { get: () => globalVids },
+        currentLot:  { get: () => currentLot },
+        currentVids: { get: () => currentVids },
+        applyTheme:  { value: (dark) => applyTheme(dark) },
+        mergeExcelWorkbook: { value: (wb) => mergeExcelWorkbook(wb) },
+        parseExcelWorkbook: { value: (wb) => parseExcelWorkbook(wb) },
+    });
+
+    /* ===== HELPERS ===== */
+    function status(msg, type) {
+        const cls = type === 'ok' ? 'st-ok' : type === 'warn' ? 'st-wrn' : type === 'err' ? 'st-err' : '';
+        statusBar.innerHTML = cls ? `<span class="${cls}">${msg}</span>` : msg;
+    }
+
+    function isLotScanned(lotName) {
+        return scannedLots.some(s => s.lot === lotName);
+    }
+
+    /* ===== PARSE INPUT ===== */
+    function parseInput(text) {
+        const lines = text.split('\n');
+        intmsGroups = [];
+        lotToGroup  = {};
+        allLots     = [];
+        let group   = null;
+
+        for (const raw of lines) {
+            const line = raw.trim();
+            if (!line) continue;
+            if (line.startsWith('INTMS#')) {
+                group = { name: line, lots: [] };
+                intmsGroups.push(group);
+            } else {
+                if (!group) {
+                    group = { name: '', lots: [] };
+                    intmsGroups.push(group);
+                }
+                group.lots.push(line);
+                lotToGroup[line] = group.name;
+                allLots.push(line);
+            }
+        }
+    }
+
+    /* ===== AUTOCOMPLETE ===== */
+    function searchLots(query) {
+        if (!query) return allLots.slice();
+        const q = query.toUpperCase();
+        return allLots.filter(l => l.toUpperCase().includes(q));
+    }
+
+    function renderAc() {
+        if (acResults.length === 0) { acDropdown.classList.remove('open'); return; }
+
+        acDropdown.innerHTML = acResults.map((lot, i) => {
+            const done = isLotScanned(lot) ? '<span class="ac-done">✓</span>' : '';
+            const hi   = i === acIndex ? ' hi' : '';
+            const grp  = lotToGroup[lot] ? `<span class="ac-group">${lotToGroup[lot]}</span>` : '';
+            return `<div class="ac-item${hi}" data-i="${i}">` +
+                       `<span>${lot} ${grp}</span>` +
+                       `${done}` +
+                   `</div>`;
+        }).join('');
+
+        acDropdown.classList.add('open');
+
+        // click handler
+        acDropdown.querySelectorAll('.ac-item').forEach(el => {
+            el.addEventListener('mousedown', e => {     // mousedown so it fires before blur
+                e.preventDefault();
+                selectLot(acResults[+el.dataset.i]);
+            });
+        });
+    }
+
+    function scrollAcItem() {
+        const items = acDropdown.querySelectorAll('.ac-item');
+        items.forEach((el, i) => el.classList.toggle('hi', i === acIndex));
+        if (acIndex >= 0 && items[acIndex]) items[acIndex].scrollIntoView({ block: 'nearest' });
+    }
+
+    function closeAc() { acDropdown.classList.remove('open'); acResults = []; acIndex = -1; }
+
+    /* ===== SELECT LOT ===== */
+    function selectLot(lotName) {
+        currentLot = lotName;
+
+        // Restore existing VIDs if lot was previously scanned or merged
+        const existingEntry = scannedLots.find(s => s.lot === lotName);
+        if (existingEntry && existingEntry.vids && existingEntry.vids.length > 0) {
+            currentVids = existingEntry.vids.slice();
+            field4.value = currentVids.join('\n');
+            vidBadge.textContent = `${currentVids.length} VIDs`;
+        } else {
+            currentVids = [];
+            field4.value = '';
+            vidBadge.textContent = '0 VIDs';
+        }
+
+        field2.value    = lotName;
+        field2.disabled = true;
+        field3.disabled = false;
+        field3.value    = '';
+        field3.classList.remove('input-error');
+        btnNext.disabled = false;
+        btnScan.disabled = true;
+        btnExport.disabled = true;
+
+        closeAc();
+
+        lotBadge.textContent = lotToGroup[lotName] ? `${lotName}  (${lotToGroup[lotName]})` : lotName;
+
+        field3.focus();
+        if (currentVids.length > 0) {
+            status(`Đã chọn lot <b>${lotName}</b> (đã có ${currentVids.length} VIDs). Tiếp tục scan hoặc nhấn Next Lot.`, 'ok');
+        } else {
+            status(`Đã chọn lot <b>${lotName}</b>. Hãy scan VID.`, 'ok');
+        }
+    }
+
+    /* ===== ADD VID ===== */
+    function addVid(vid) {
+        const v = vid.trim();
+        if (!v) return false;
+        if (globalVids.has(v)) {
+            // find which lot has it
+            let owner = currentVids.includes(v) ? currentLot : null;
+            if (!owner) {
+                const found = scannedLots.find(s => s.vids && s.vids.includes(v));
+                if (found) owner = found.lot;
+            }
+            const where = owner ? ` (thuộc lot <b>${owner}</b>)` : '';
+            status(`⚠️ VID <b>${v}</b> đã tồn tại${where}! Không thể thêm trùng.`, 'err');
+            field3.classList.remove('input-error');
+            void field3.offsetWidth; // re-trigger shake animation
+            field3.classList.add('input-error');
+            return false;
+        }
+        field3.classList.remove('input-error');
+        currentVids.push(v);
+        globalVids.add(v);
+        field4.value = currentVids.join('\n');
+        vidBadge.textContent = `${currentVids.length} VIDs`;
+        field4.scrollTop = field4.scrollHeight;
+        status(`✓ Đã thêm VID <b>${v}</b> — tổng ${currentVids.length} VID(s) cho lot ${currentLot}.`, 'ok');
+        return true;
+    }
+
+    /* ===== NEXT LOT ===== */
+    function doNextLot() {
+        if (!currentLot) { status('Chưa chọn lot nào!', 'err'); return; }
+
+        // Auto-commit any pending VID typed in field3
+        const pendingVid = field3.value.trim();
+        if (pendingVid) {
+            addVid(pendingVid);
+            field3.value = '';
+        }
+
+        const savedLot = currentLot;
+        const savedCount = currentVids.length;
+
+        // save (overwrite if already exists, but only if has VIDs)
+        const idx = scannedLots.findIndex(s => s.lot === currentLot);
+        if (savedCount > 0) {
+            const entry = { lot: currentLot, vids: currentVids.slice(), group: lotToGroup[currentLot] };
+            if (idx >= 0) scannedLots[idx] = entry;
+            else scannedLots.push(entry);
+        } else {
+            // If lot has 0 VIDs, do not save or keep in scannedLots
+            if (idx >= 0) scannedLots.splice(idx, 1);
+        }
+
+        // reset
+        currentLot  = null;
+        currentVids = [];
+        field2.value    = '';
+        field2.disabled = false;
+        field3.value    = '';
+        field3.disabled = true;
+        field3.classList.remove('input-error');
+        field4.value    = '';
+        btnNext.disabled = true;
+        btnScan.disabled = false;
+        lotBadge.textContent = 'Chưa chọn lot';
+        vidBadge.textContent = '0 VIDs';
+        btnExport.disabled = scannedLots.filter(s => s.vids && s.vids.length > 0).length === 0;
+
+        field2.focus();
+        if (savedCount > 0) {
+            status(`Đã lưu lot <b>${savedLot}</b> (${savedCount} VIDs). Tổng ${scannedLots.length}/${allLots.length} lots đã scan.`, 'ok');
+        } else {
+            status(`⚠️ Lot <b>${savedLot}</b> không có VID nào nên không được lưu.`, 'warn');
+        }
+    }
+
+    /* ===== EXPORT XLSX ===== */
+    function doExport() {
+        // Auto-commit any pending VID in field3
+        if (currentLot && field3.value.trim()) {
+            addVid(field3.value.trim());
+            field3.value = '';
+        }
+
+        // Auto-save current lot if active and has VIDs
+        if (currentLot && currentVids.length > 0) {
+            const idx = scannedLots.findIndex(s => s.lot === currentLot);
+            const entry = { lot: currentLot, vids: currentVids.slice(), group: lotToGroup[currentLot] };
+            if (idx >= 0) scannedLots[idx] = entry;
+            else scannedLots.push(entry);
+        }
+
+        // Filter out any lots with 0 VIDs (never export empty lots)
+        const validLots = scannedLots.filter(s => s.vids && s.vids.length > 0);
+
+        if (validLots.length === 0) { status('Không có dữ liệu hợp lệ để xuất!', 'err'); return; }
+
+        try {
+            // Group scanned lots by INTMS group (preserve INTMS order from input, lot order = scan order)
+            const grouped = new Map();
+            intmsGroups.forEach(g => grouped.set(g.name, []));
+            validLots.forEach(e => {
+                const grpName = e.group !== undefined ? e.group : '';
+                if (!grouped.has(grpName)) {
+                    grouped.set(grpName, []);
+                    intmsGroups.push({ name: grpName, lots: [] });
+                }
+                grouped.get(grpName).push(e);
+            });
+
+            const activeGroups = intmsGroups.filter(g => (grouped.get(g.name) || []).length > 0);
+            if (activeGroups.length === 0) { status('Không có dữ liệu hợp lệ để xuất!', 'err'); return; }
+
+            // Build row arrays per group (starting from data row 3 onward)
+            const groupCols = [];   // [{name, rows: [[lotCell, vidCell], ...]}]
+            let maxDataRows = 0;
+
+            for (const g of activeGroups) {
+                const entries = grouped.get(g.name).filter(e => e.vids && e.vids.length > 0);
+                const rows = [];
+                for (let i = 0; i < entries.length; i++) {
+                    const e = entries[i];
+                    rows.push([e.lot, e.vids[0]]);
+                    for (let j = 1; j < e.vids.length; j++) rows.push(['', e.vids[j]]);
+                    if (i < entries.length - 1) rows.push(['', '']);   // blank separator row
+                }
+                groupCols.push({ name: g.name, rows });
+                maxDataRows = Math.max(maxDataRows, rows.length);
+            }
+
+            // Total columns = 2 per group + 1 separator between groups
+            const totalCols = activeGroups.length * 2 + (activeGroups.length - 1);
+
+            // Build 2-D array
+            const sheet = [];
+
+            // Row 1: INTMS headers
+            const r1 = new Array(totalCols).fill('');
+            activeGroups.forEach((_, i) => { r1[i * 3] = groupCols[i].name; });
+            sheet.push(r1);
+
+            // Row 2: LOT / VID headers
+            const r2 = new Array(totalCols).fill('');
+            activeGroups.forEach((_, i) => { r2[i * 3] = 'LOT'; r2[i * 3 + 1] = 'VID'; });
+            sheet.push(r2);
+
+            // Data rows
+            for (let r = 0; r < maxDataRows; r++) {
+                const row = new Array(totalCols).fill('');
+                groupCols.forEach((gc, i) => {
+                    if (r < gc.rows.length) {
+                        row[i * 3]     = gc.rows[r][0];
+                        row[i * 3 + 1] = gc.rows[r][1];
+                    }
+                });
+                sheet.push(row);
+            }
+
+            // Create workbook
+            const ws = XLSX.utils.aoa_to_sheet(sheet);
+
+            // Column widths
+            const cols = [];
+            for (let c = 0; c < totalCols; c++) {
+                if (c % 3 === 2) cols.push({ wch: 3 });        // separator
+                else             cols.push({ wch: 16 });       // LOT / VID
+            }
+            ws['!cols'] = cols;
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+            XLSX.writeFile(wb, 'output.xlsx');
+
+            status(`Đã xuất <b>output.xlsx</b> — ${validLots.length} lots.`, 'ok');
+        } catch (err) {
+            console.error(err);
+            status('Lỗi khi xuất file: ' + err.message, 'err');
+        }
+    }
+
+    /* ===== PARSE EXCEL WORKBOOK (FOR MERGE) ===== */
+    function parseExcelWorkbook(wb) {
+        if (!wb || !wb.SheetNames || wb.SheetNames.length === 0) {
+            throw new Error('File Excel không có sheet nào!');
+        }
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        if (!rawRows || rawRows.length === 0) {
+            throw new Error('File Excel rỗng, không có dữ liệu!');
+        }
+
+        // Tìm các cặp cột chứa LOT & VID
+        let lotColIndices = [];
+        let headerRowIdx = -1;
+
+        for (let r = 0; r < Math.min(rawRows.length, 10); r++) {
+            const row = rawRows[r] || [];
+            for (let c = 0; c < row.length; c++) {
+                const cell = String(row[c] || '').trim().toUpperCase();
+                if (cell === 'LOT') {
+                    lotColIndices.push(c);
+                    headerRowIdx = r;
+                }
+            }
+            if (lotColIndices.length > 0) break;
+        }
+
+        // Nếu không tìm thấy header 'LOT', giả định cột 0 là LOT, cột 1 là VID
+        if (lotColIndices.length === 0) {
+            lotColIndices = [0];
+            headerRowIdx = 0;
+            const firstRow = rawRows[0] || [];
+            for (let c = 3; c < firstRow.length; c += 3) {
+                lotColIndices.push(c);
+            }
+        }
+
+        const parsedEntries = [];
+
+        lotColIndices.forEach(colLot => {
+            const colVid = colLot + 1;
+            // Header INTMS (nếu có dòng trên headerRowIdx)
+            let fileIntms = '';
+            if (headerRowIdx > 0) {
+                const aboveCell = String((rawRows[headerRowIdx - 1] || [])[colLot] || '').trim();
+                if (aboveCell.startsWith('INTMS#')) {
+                    fileIntms = aboveCell;
+                } else if (aboveCell) {
+                    fileIntms = aboveCell;
+                }
+            }
+
+            let currLot = null;
+            let currVids = [];
+
+            for (let r = headerRowIdx + 1; r < rawRows.length; r++) {
+                const row = rawRows[r] || [];
+                const lotVal = String(row[colLot] || '').trim();
+                const vidVal = String(row[colVid] || '').trim();
+
+                if (lotVal) {
+                    if (currLot) {
+                        parsedEntries.push({ lot: currLot, vids: currVids, fileIntms });
+                    }
+                    currLot = lotVal;
+                    currVids = vidVal ? [vidVal] : [];
+                } else if (vidVal) {
+                    if (currLot) {
+                        currVids.push(vidVal);
+                    }
+                }
+            }
+
+            if (currLot) {
+                parsedEntries.push({ lot: currLot, vids: currVids, fileIntms });
+            }
+        });
+
+        return parsedEntries;
+    }
+
+    /* ===== MERGE EXCEL WORKBOOK ===== */
+    function mergeExcelWorkbook(wb) {
+        const parsedEntries = parseExcelWorkbook(wb);
+        if (!parsedEntries || parsedEntries.length === 0) {
+            throw new Error('Không tìm thấy dữ liệu LOT/VID nào trong file Excel!');
+        }
+
+        let mergedLotCount = 0;
+        let mergedVidCount = 0;
+
+        // Nếu trường input có dữ liệu nhưng chưa nhấn nút "Nhập Input", tự động nạp
+        if (allLots.length === 0 && field1.value.trim()) {
+            parseInput(field1.value);
+        }
+
+        parsedEntries.forEach(item => {
+            if (!item.lot) return;
+
+            // Dò tìm lot trong trường input (trường 1)
+            let targetGroup;
+            if (lotToGroup[item.lot] !== undefined) {
+                // Có trong trường input -> gán vào đúng INTMS của input
+                targetGroup = lotToGroup[item.lot];
+            } else {
+                // Không có trong trường input: dùng INTMS từ file, nếu không có thì để trống ''
+                targetGroup = item.fileIntms || '';
+            }
+
+            // Đảm bảo group tồn tại trong intmsGroups
+            let grpObj = intmsGroups.find(g => g.name === targetGroup);
+            if (!grpObj) {
+                grpObj = { name: targetGroup, lots: [] };
+                intmsGroups.push(grpObj);
+            }
+            if (!grpObj.lots.includes(item.lot)) grpObj.lots.push(item.lot);
+            lotToGroup[item.lot] = targetGroup;
+            if (!allLots.includes(item.lot)) allLots.push(item.lot);
+
+            // Tìm lot trong scannedLots
+            let scannedEntry = scannedLots.find(s => s.lot === item.lot);
+            if (scannedEntry) {
+                let addedVids = 0;
+                item.vids.forEach(v => {
+                    if (!scannedEntry.vids.includes(v)) {
+                        scannedEntry.vids.push(v);
+                        globalVids.add(v);
+                        addedVids++;
+                    }
+                });
+                scannedEntry.group = targetGroup;
+                if (addedVids > 0) mergedVidCount += addedVids;
+                mergedLotCount++;
+            } else {
+                const uniqueVids = [];
+                item.vids.forEach(v => {
+                    if (!uniqueVids.includes(v)) {
+                        uniqueVids.push(v);
+                        globalVids.add(v);
+                    }
+                });
+                scannedLots.push({
+                    lot: item.lot,
+                    vids: uniqueVids,
+                    group: targetGroup
+                });
+                mergedLotCount++;
+                mergedVidCount += uniqueVids.length;
+            }
+        });
+
+        // Nếu lot đang chọn trên UI được cập nhật, đồng bộ lại trường 4
+        if (currentLot) {
+            const activeEntry = scannedLots.find(s => s.lot === currentLot);
+            if (activeEntry) {
+                currentVids = activeEntry.vids.slice();
+                field4.value = currentVids.join('\n');
+                vidBadge.textContent = `${currentVids.length} VIDs`;
+            }
+        }
+
+        btnExport.disabled = currentLot ? true : (scannedLots.filter(s => s.vids && s.vids.length > 0).length === 0);
+        return { mergedLotCount, mergedVidCount };
+    }
+
+    /* ===== EVENT: Nhập Input ===== */
+    btnInput.addEventListener('click', () => {
+        const text = field1.value;
+        if (!text.trim()) { status('Vui lòng dán dữ liệu lot vào ô bên trái!', 'err'); field1.focus(); return; }
+
+        parseInput(text);
+        if (allLots.length === 0) { status('Không tìm thấy lot nào! Kiểm tra lại dữ liệu.', 'err'); return; }
+
+        // Reset everything
+        scannedLots = [];
+        globalVids  = new Set();
+        currentLot  = null;
+        currentVids = [];
+        field2.value = '';  field2.disabled = false;
+        field3.value = '';  field3.disabled = true;
+        field4.value = '';
+        btnScan.disabled  = false;
+        btnNext.disabled  = true;
+        btnExport.disabled = true;
+        lotBadge.textContent = 'Chưa chọn lot';
+        vidBadge.textContent = '0 VIDs';
+
+        field2.focus();
+        const namedCount = intmsGroups.filter(g => g.name).length;
+        const groupInfo = namedCount > 0 ? ` từ <b>${namedCount}</b> nhóm INTMS` : '';
+        status(`Đã load <b>${allLots.length}</b> lots${groupInfo}. Hãy tìm lot.`, 'ok');
+    });
+
+    /* ===== EVENT: Scan VID button ===== */
+    btnScan.addEventListener('click', () => {
+        const q = field2.value.trim();
+        if (!q) { status('Nhập tên lot để tìm!', 'warn'); field2.focus(); return; }
+
+        if (acResults.length > 0 && acIndex >= 0) {
+            selectLot(acResults[acIndex]);
+            return;
+        }
+        // try exact then single match
+        const exact = allLots.find(l => l === q);
+        if (exact) { selectLot(exact); return; }
+
+        const results = searchLots(q);
+        if (results.length === 1) { selectLot(results[0]); return; }
+        if (results.length > 1) {
+            acResults = results; acIndex = 0; renderAc();
+            status('Nhiều kết quả — dùng ↑↓ để chọn, Enter để xác nhận.', 'warn');
+            return;
+        }
+        status(`Không tìm thấy lot cho "<b>${q}</b>"!`, 'err');
+    });
+
+    /* ===== EVENT: Next Lot ===== */
+    btnNext.addEventListener('click', doNextLot);
+
+    /* ===== EVENT: Export ===== */
+    btnExport.addEventListener('click', doExport);
+
+    /* ===== EVENT: Copy VID ===== */
+    btnCopy.addEventListener('click', () => {
+        const text = field4.value;
+        if (!text) { status('Không có VID nào để copy!', 'warn'); return; }
+        navigator.clipboard.writeText(text)
+            .then(() => status(`Đã copy <b>${currentVids.length}</b> VIDs vào clipboard!`, 'ok'))
+            .catch(() => {
+                field4.select();
+                document.execCommand('copy');
+                status(`Đã copy <b>${currentVids.length}</b> VIDs vào clipboard!`, 'ok');
+            });
+    });
+
+    /* ===== EVENT: Field 2 — input (autocomplete) ===== */
+    field2.addEventListener('input', () => {
+        const q = field2.value.trim();
+        acResults = q ? searchLots(q) : allLots.slice();
+        acIndex   = acResults.length > 0 ? 0 : -1;
+        renderAc();
+    });
+
+    field2.addEventListener('focus', () => {
+        if (allLots.length === 0) return;
+        const q = field2.value.trim();
+        acResults = q ? searchLots(q) : allLots.slice();
+        acIndex   = acResults.length > 0 ? 0 : -1;
+        renderAc();
+    });
+
+    field2.addEventListener('blur', () => {
+        // small delay so mousedown on ac-item fires first
+        setTimeout(closeAc, 180);
+    });
+
+    /* ===== EVENT: Field 2 — keyboard nav ===== */
+    field2.addEventListener('keydown', e => {
+        const open = acDropdown.classList.contains('open');
+
+        if (e.key === 'Escape') { closeAc(); return; }
+
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (open && acIndex >= 0 && acResults[acIndex]) {
+                selectLot(acResults[acIndex]);
+            } else {
+                btnScan.click();
+            }
+            return;
+        }
+
+        if (!open) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            acIndex = Math.min(acIndex + 1, acResults.length - 1);
+            scrollAcItem();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            acIndex = Math.max(acIndex - 1, 0);
+            scrollAcItem();
+        }
+    });
+
+    /* ===== EVENT: Field 3 — VID entry ===== */
+    field3.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const vid = field3.value.trim();
+            if (vid) {
+                if (addVid(vid)) {
+                    field3.value = '';
+                }
+            }
+        }
+    });
+
+    field3.addEventListener('input', () => {
+        field3.classList.remove('input-error');
+    });
+
+    /* ===== EVENT: Merge File ===== */
+    if (btnMergeFile && fileMergeInput) {
+        btnMergeFile.addEventListener('click', () => {
+            fileMergeInput.value = '';
+            fileMergeInput.click();
+        });
+
+        fileMergeInput.addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (evt) {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const wb = XLSX.read(data, { type: 'array' });
+                    const res = mergeExcelWorkbook(wb);
+                    status(`Đã hợp nhất thành công <b>${res.mergedLotCount}</b> lots (thêm <b>${res.mergedVidCount}</b> VIDs) từ file <b>${file.name}</b>. Sẵn sàng xuất file!`, 'ok');
+                } catch (err) {
+                    console.error(err);
+                    status(`Lỗi khi hợp nhất file: ${err.message}`, 'err');
+                }
+            };
+            reader.onerror = function () {
+                status('Lỗi khi đọc file!', 'err');
+            };
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    /* ===== THEME TOGGLE ===== */
+    function applyTheme(isDark) {
+        document.body.classList.toggle('dark-mode', isDark);
+        if (btnThemeToggle) {
+            btnThemeToggle.innerHTML = isDark ? '☀️ Light' : '🌙 Dark';
+            btnThemeToggle.title = isDark ? 'Chuyển sang chế độ Sáng (Light Mode)' : 'Chuyển sang chế độ Tối (Dark Mode)';
+        }
+        try { localStorage.setItem('scanVidTheme', isDark ? 'dark' : 'light'); } catch (_) {}
+    }
+
+    const savedTheme = (() => {
+        try { return localStorage.getItem('scanVidTheme'); } catch (_) { return null; }
+    })();
+
+    if (savedTheme === 'dark') {
+        applyTheme(true);
+    } else if (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        applyTheme(true);
+    }
+
+    if (btnThemeToggle) {
+        btnThemeToggle.addEventListener('click', () => {
+            const isDark = document.body.classList.contains('dark-mode');
+            applyTheme(!isDark);
+        });
+    }
+
+})();
+</script>
+</body>
+</html>
