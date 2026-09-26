@@ -399,7 +399,25 @@
 
 <!-- ==================== HEADER ==================== -->
 <header class="app-header">
-    <h1>📋 Scan VID Web App</h1>
+    <div style="display:flex; align-items:center; gap:8px;">
+        <h1>📋 Scan VID Web App</h1>
+        <span id="envBadge" style="
+            font-size: 0.6rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 700;
+            display: none;
+            letter-spacing: 0.5px;
+        ">PREVIEW</span>
+        <span style="
+            font-size: 0.6rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.7);
+            font-weight: 600;
+        " id="versionBadge">v0.0.1</span>
+    </div>
     <div style="display:flex; align-items:center; gap:8px;">
         <span style="font-size:.72rem; opacity:.75;">Owner: TANG, HUYNH MINH TIEN</span>
         <button class="btn-theme-toggle" id="btnThemeToggle" title="Chuyển chế độ Sáng / Tối">🌙 Dark</button>
@@ -1179,6 +1197,26 @@
             applyTheme(!isDark);
         });
     }
+
+    /* ===== ENVIRONMENT DETECTION ===== */
+    (function detectEnv() {
+        const badge = document.getElementById('envBadge');
+        if (!badge) return;
+        const host = window.location.hostname;
+
+        if (host.includes('-git-preview') || host.includes('preview')) {
+            badge.style.display = 'inline';
+            badge.style.background = '#f39c12';
+            badge.style.color = '#fff';
+            badge.textContent = '🧪 PREVIEW';
+        } else if (host === 'localhost' || host === '127.0.0.1' || host === '') {
+            badge.style.display = 'inline';
+            badge.style.background = '#3498db';
+            badge.style.color = '#fff';
+            badge.textContent = '💻 LOCAL';
+        }
+        // Production: badge stays hidden
+    })();
 
 })();
 </script>
