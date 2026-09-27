@@ -6,8 +6,8 @@ Web application hỗ trợ scan và quản lý VID (Visual Inspection Data) cho 
 
 | Environment | Branch | URL | Version |
 |---|---|---|---|
-| Production | `main` | [scan-vid-web-app.vercel.app](https://scan-vid-web-app.vercel.app) | v0.0.1 |
-| Preview | `preview` | Auto-generated bởi Vercel | v0.0.2-dev |
+| Production | `main` | [scan-vid-web-app.vercel.app](https://scan-vid-web-app.vercel.app) | v0.0.2 |
+| Preview | `preview` | Auto-generated bởi Vercel | v0.0.3-dev |
 
 ## 🔄 Workflow
 
